@@ -18,12 +18,12 @@ import (
 
 var serialPort = flag.String("serial", "/dev/master", "Serial Port Path to Use")
 var webPort = flag.Int("port", 8080, "Webserver port to use")
-var noSerial = flag.Bool("noserial", true, "Use serial?")
+var useSerial = flag.Bool("enableserial", true, "Use serial?")
 
 type PowerDevice struct {
 	Name string `json:"name"`
-	onChannel int `json:"on"`
-	offChannel int `json:"off"`
+	OnChannel int `json:"on"`
+	OffChannel int `json:"off"`
 	PoweredState bool `json:"powered_state"`
 }
 
@@ -71,11 +71,13 @@ func findAction(action string) *ActionDevice {
 	return nil
 }
 
-func sendDeviceSignal(onChannel int) {
+func sendDeviceSignal(OnChannel int) {
 	if SerialPort != nil {
-		_, err := fmt.Fprintf(SerialPort, "c%d\n", onChannel)
+		num, err := fmt.Fprintf(SerialPort, "%dc\n", OnChannel)
 		if err != nil {
 			fmt.Printf("ERROR WRITING TO SERIAL PORT\n")
+		} else {
+			fmt.Printf("Write %d bytes to serial port.\n", num)
 		}
 	} else {
 		fmt.Printf("Didn't connect to serial port.\n")
@@ -90,7 +92,7 @@ func turnOnDevice(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Can't find Device", http.StatusNotFound)
 		return
 	}
-	sendDeviceSignal(device.onChannel)
+	sendDeviceSignal(device.OnChannel)
 	fmt.Fprintf(w, "OK", device.Name);
 	fmt.Printf("[device_change]: %s turning on.\n", device_name);
 }
@@ -103,7 +105,7 @@ func turnOffDevice(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Can't find Device", http.StatusNotFound)
 		return
 	}
-	sendDeviceSignal(device.offChannel)
+	sendDeviceSignal(device.OffChannel)
 	fmt.Fprintf(w, "OK", device.Name);
 	fmt.Printf("[device_change]: %s turning off.\n", device_name);
 }
@@ -190,7 +192,7 @@ func readConfigFile() {
 func setupLightState() {
 	// turn off all lights
 	for _, el := range ConfigJson.PowerDevices {
-		sendDeviceSignal(el.offChannel)
+		sendDeviceSignal(el.OffChannel)
 		el.PoweredState = false
 		time.Sleep(100)
 	}
@@ -200,7 +202,7 @@ func setupLightState() {
 func main(){
 	flag.Parse()
 	readConfigFile()
-	if !*noSerial {
+	if *useSerial {
 		connectSerial()
 	}
 	setupLightState()
