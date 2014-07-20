@@ -1,0 +1,12 @@
+{
+    "power_devices": [
+    {"name": "lightmain", "on": 13, "off": 12},
+    {"name": "lightbr1",  "on": 12, "off": 12},
+    {"name": "lightbr2", "on": 11, "off": 10},
+    {"name": "heater", "on": 10, "off": 10}
+  ], "action_devices": [
+    {"name": "buzzer", "type": "script", "path": "buzzer.sh"},
+    {"name": "playsong", "type": "script", "path": "start_music.sh"},
+    {"name": "volume", "type": "script", "path": "set_volume.sh"}
+  ]
+}
