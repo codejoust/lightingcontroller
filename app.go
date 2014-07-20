@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"bufio"
 	"time"
 	"fmt"
 	"encoding/json"
@@ -19,6 +18,7 @@ import (
 
 var serialPort = flag.String("serial", "/dev/master", "Serial Port Path to Use")
 var webPort = flag.Int("port", 8080, "Webserver port to use")
+var noSerial = flag.Bool("noserial", true, "Use serial?")
 
 type PowerDevice struct {
 	Name string `json:"name"`
@@ -28,8 +28,8 @@ type PowerDevice struct {
 }
 
 type ActionDevice struct {
-	Type string `json:"path"`
-	Path string `json:"type"`
+	Type string `json:"type"`
+	Path string `json:"path"`
 	Name string `json:"name"`
 }
 
@@ -106,35 +106,39 @@ func turnOffDevice(w http.ResponseWriter, req *http.Request) {
 	sendDeviceSignal(device.offChannel)
 	fmt.Fprintf(w, "OK", device.Name);
 	fmt.Printf("[device_change]: %s turning off.\n", device_name);
+}
 
+func runCommand(action_info *ActionDevice, req *http.Request) {
+	val, err := strconv.Atoi(req.FormValue("val"))
+	if err == nil {
+		cmd := exec.Command("sh", "-c", "scripts/" + action_info.Path, strconv.Itoa(val))
+		cmd.Start()
+	} else {
+		cmd := exec.Command("sh", "-c", "scripts/" + action_info.Path, "")
+		cmd.Start()
+	}
 }
 
 func performAction(w http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	action_info := findAction(vars["action"])
+	action := mux.Vars(req)["action"]
+	action_info := findAction(action)
 	if action_info == nil {
 		http.Error(w, "Can't find Device", http.StatusNotFound)
 		return
 	}
-	if (action_info.Type == 'script') {
-		val, err := strconv.Atoi(r.FormValue("val"))
-		if err == nil {
-			cmd := exec.Command("./scripts/" + action_info.Path, strconv.Itoa(val))
-			cmd.Start()
-		} else {
-			cmd := exec.Command("./scripts/" + action_info.Path, "")
-			cmd.Start()
-		}
+	if action_info.Type == "script" {
+		go runCommand(action_info, req)
 	} else {
 		http.Error(w, "Action not implemented yet.", http.StatusNotFound)
+		return
 	}
-	fmt.Printf("Action %s has been completed.\n", action)
+	fmt.Printf("Action %s has been completed.\n", action_info.Name)
 	fmt.Fprintf(w, "OK")
 }
 
 func listActions(w http.ResponseWriter, req *http.Request) {
 	enc := json.NewEncoder(w)
-	if err := enc.Encode(&ConfigJson.ActionDevice); err != nil {
+	if err := enc.Encode(&ConfigJson.ActionDevices); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -174,11 +178,11 @@ func setupMuxes() {
 func readConfigFile() {
 	configFile, err := os.Open("conf.json")
 	if err != nil {
-		log.Fatal("Cannot Read Config Json\n");
+		log.Fatal("Cannot Read Config Json%s\n", err);
 	}
 	jsonParser := json.NewDecoder(configFile)
 	if err = jsonParser.Decode(&ConfigJson); err != nil {
-		log.Fatal("Cannot Read Config Json\n");
+		log.Fatal("Cannot Read Config Json%s\n", err);
 	}
 	fmt.Printf("Successfully read JSON file.\n")
 }
@@ -196,7 +200,9 @@ func setupLightState() {
 func main(){
 	flag.Parse()
 	readConfigFile()
-	connectSerial()
+	if !*noSerial {
+		connectSerial()
+	}
 	setupLightState()
 	setupMuxes()
 	fmt.Printf("Setup paths.\n")

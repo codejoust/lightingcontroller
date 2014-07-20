@@ -8,3 +8,4 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 mpg123 $DIR/data/buzzer.mp3
 
 amixer sset PCM,0 $CURRENT_VOLUME%
+
