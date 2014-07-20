@@ -8,6 +8,6 @@
     {"name": "buzzer", "type": "script", "path": "buzzer"},
     {"name": "playsong", "type": "script", "path": "start_music"},
     {"name": "volume_up", "type": "script", "path": "volume_up"},
-    {"name": "volume_up", "type": "script", "path": "volume_down"}
+    {"name": "volume_down", "type": "script", "path": "volume_down"}
   ]
 }
