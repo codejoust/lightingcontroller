@@ -1,9 +1,9 @@
 {
     "power_devices": [
-    {"name": "lightmain", "on": 12, "off": 11},
+    {"name": "lightmain", "on": 11, "off": 12},
     {"name": "lightbr1",  "on": 10, "off": 13},
     {"name": "lightbr2", "on": 7, "off": 9},
-    {"name": "heater", "on": 6, "off": 8}
+    {"name": "heater", "on": 5, "off": 7}
   ], "action_devices": [
     {"name": "buzzer", "type": "script", "path": "buzzer"},
     {"name": "playsong", "type": "script", "path": "start_music"},
