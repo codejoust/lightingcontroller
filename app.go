@@ -9,6 +9,9 @@ import (
 	"log"
 	"io"
 	"os"
+	"os/exec"
+	"strconv"
+	"bufio"
 	"time"
 	"fmt"
 	"encoding/json"
@@ -59,6 +62,15 @@ func findDevice(action string) *PowerDevice {
 	return nil
 }
 
+func findAction(action string) *ActionDevice {
+	for _, el := range ConfigJson.ActionDevices {
+		if el.Name == action {
+			return &el
+		}
+	}
+	return nil
+}
+
 func sendDeviceSignal(onChannel int) {
 	if SerialPort != nil {
 		_, err := fmt.Fprintf(SerialPort, "c%d\n", onChannel)
@@ -74,6 +86,10 @@ func turnOnDevice(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	device_name := vars["device"]
 	device := findDevice(device_name)
+	if device == nil {
+		http.Error(w, "Can't find Device", http.StatusNotFound)
+		return
+	}
 	sendDeviceSignal(device.onChannel)
 	fmt.Fprintf(w, "OK", device.Name);
 	fmt.Printf("[device_change]: %s turning on.\n", device_name);
@@ -83,6 +99,10 @@ func turnOffDevice(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	device_name := vars["device"]
 	device := findDevice(device_name)
+	if device == nil {
+		http.Error(w, "Can't find Device", http.StatusNotFound)
+		return
+	}
 	sendDeviceSignal(device.offChannel)
 	fmt.Fprintf(w, "OK", device.Name);
 	fmt.Printf("[device_change]: %s turning off.\n", device_name);
@@ -91,8 +111,32 @@ func turnOffDevice(w http.ResponseWriter, req *http.Request) {
 
 func performAction(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	action := vars["action"]
-	fmt.Printf("Action %s will be completed.\n", action)
+	action_info := findAction(vars["action"])
+	if action_info == nil {
+		http.Error(w, "Can't find Device", http.StatusNotFound)
+		return
+	}
+	if (action_info.Type == 'script') {
+		val, err := strconv.Atoi(r.FormValue("val"))
+		if err == nil {
+			cmd := exec.Command("./scripts/" + action_info.Path, strconv.Itoa(val))
+			cmd.Start()
+		} else {
+			cmd := exec.Command("./scripts/" + action_info.Path, "")
+			cmd.Start()
+		}
+	} else {
+		http.Error(w, "Action not implemented yet.", http.StatusNotFound)
+	}
+	fmt.Printf("Action %s has been completed.\n", action)
+	fmt.Fprintf(w, "OK")
+}
+
+func listActions(w http.ResponseWriter, req *http.Request) {
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(&ConfigJson.ActionDevice); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func queryAllLightState(w http.ResponseWriter, req *http.Request) {
@@ -121,6 +165,7 @@ func setupMuxes() {
 	r.HandleFunc("/devices/power/{device}/on", turnOnDevice)
 	r.HandleFunc("/devices/power/{device}/off", turnOffDevice)
 	r.HandleFunc("/actions/{action}", performAction)
+	r.HandleFunc("/actions", listActions)
 	r.HandleFunc("/devices/power/{device}", queryLightState)
 	r.HandleFunc("/devices/power", queryAllLightState)
 	http.Handle("/", r)
@@ -151,8 +196,8 @@ func setupLightState() {
 func main(){
 	flag.Parse()
 	readConfigFile()
-	setupLightState()
 	connectSerial()
+	setupLightState()
 	setupMuxes()
 	fmt.Printf("Setup paths.\n")
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *webPort), nil))

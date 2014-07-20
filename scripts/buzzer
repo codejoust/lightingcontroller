@@ -1,0 +1,10 @@
+#!/bin/bash
+
+CURRENT_VOLUME="$(amixer get PCM | grep -i [0-9]*%|sed 's/%//')"
+
+amixer sset PCM,0 100%
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+mpg123 $DIR/data/buzzer.mp3
+
+amixer sset PCM,0 $CURRENT_VOLUME%

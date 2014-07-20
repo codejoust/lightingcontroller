@@ -5,8 +5,9 @@
     {"name": "lightbr2", "on": 7, "off": 9},
     {"name": "heater", "on": 6, "off": 8}
   ], "action_devices": [
-    {"name": "buzzer", "type": "script", "path": "buzzer.sh"},
-    {"name": "playsong", "type": "script", "path": "start_music.sh"},
-    {"name": "volume", "type": "script", "path": "set_volume.sh"}
+    {"name": "buzzer", "type": "script", "path": "buzzer"},
+    {"name": "playsong", "type": "script", "path": "start_music"},
+    {"name": "volume_up", "type": "script", "path": "volume_up"}
+    {"name": "volume_up", "type": "script", "path": "volume_down"}
   ]
 }
