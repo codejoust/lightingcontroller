@@ -20,8 +20,4 @@ _cgo_export.*
 _testmain.go
 
 *.exe
-
-build/
-
-# OSX
 .DS_Store
