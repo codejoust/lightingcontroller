@@ -1,123 +1,110 @@
-<html>
+<html ng-app="lightsApp">
 <head>
 	<title>Lighting Settings Control Manager</title>
+	<link rel="stylesheet" href="/static/app.css">
+	<style>
+		.smaller {
+			margin: 0 auto;
+			max-width: 800px;
+			margin-top: 3%;
+		}
+		.smaller material-item-content {
+			padding-left: 10px;
+		}
+	</style>
 
 </head>
 <body>
 	
-	<div class="lights" id="lightslist">
-		
-	</div>
+
+<div ng-controller="AppCtrl">
+  <material-content class="smaller material-whiteframe-z1">
+  	<material-toolbar class="material-theme-light">
+		<h1 class="material-toolbar-tools">
+        <span>Lighting Settings:</span>
+      </h1>
+	</material-toolbar>
+    <material-list>
+      <material-item ng-repeat="light in lights">
+        <material-item-content>
+          <div class="material-tile-left">
+              <power-symbol ng-click="togglePower(light.name)" data-is-on="light.powered_state"></power-symbol>
+          </div>
+          <div class="material-tile-content">
+          	<div layout>
+		      <div flex="20" layout layout-align="left left">
+		        <span>{{light.name}}</span>
+		      </div>
+<div flex ng-if="light.maxvalue!=1">
+		      <material-slider min="0" max="{{light.maxvalue}}" ng-model="light.powered_state" aria-label="red" id="red-slider" ng-change="updateLight(light.name)">
+		      </material-slider>{{light.powered_state}}
+		  </div>
+<div flex ng-if="light.maxvalue==1">
+            <material-checkbox ng-true-value="1" ng-false-value="0" ng-model="light.powered_state" ng-change="updateLight(light.name)" aria-label="power">{{light.powered_state==0?'off':'on'}}</material-checkbox>
+</div>
+		    </div>
+          </div>
+        </material-item-content>
+        <material-divider ng-if="!$last"></material-divider>
+      </material-item>
+    </material-list>
+  </material-content>
+</div>
 
 
-	<script id="lights_tpl" type="text/html">
-		<% for (var i = 0; i < lights.length; i++){ %>
-		<div class="light">
-			<span class="name"><%= lights[i].Name %></span>
-			<div data-light="<%= lights[i].Id %>" class="controls">
-				<a data-action="50" href="#">1</a>
-				 |
-				<a data-action="100" href="#">2</a>
-				 |
-				<a data-action="240" href="#">3</a>
-				 | 
-				<a data-action="0" href="#">off</a>
-			</div>
-		</div>
-		<% } %>
-	</script>
-
-	<script>
-		// Simple JavaScript Templating
-		// John Resig - http://ejohn.org/ - MIT Licensed
-		(function(){
-		  var cache = {};
-		  this.tmpl = function tmpl(str, data){
-		    // Figure out if we're getting a template, or if we need to
-		    // load the template - and be sure to cache the result.
-		    var fn = !/\W/.test(str) ?
-		      cache[str] = cache[str] ||
-		        tmpl(document.getElementById(str).innerHTML) :
-		     
-		      // Generate a reusable function that will serve as a template
-		      // generator (and which will be cached).
-		      new Function("obj",
-		        "var p=[],print=function(){p.push.apply(p,arguments);};" +
-		       
-		        // Introduce the data as local variables using with(){}
-		        "with(obj){p.push('" +
-		        // Convert the template into pure JavaScript
-		        str
-		          .replace(/[\r\t\n]/g, " ")
-		          .split("<%").join("\t")
-		          .replace(/((^|%>)[^\t]*)'/g, "$1\r")
-		          .replace(/\t=(.*?)%>/g, "',$1,'")
-		          .split("\t").join("');")
-		          .split("%>").join("p.push('")
-		          .split("\r").join("\\'")
-		      + "');}return p.join('');");
-		    // Provide some basic currying to the user
-		    return data ? fn( data ) : fn;
-		  };
-		})();
-	</script>
-
-	<script>
-		var light_control = {lights: null};
-
-		function get_request_url(url, done){
-			var req = new XMLHttpRequest();
-			req.onreadystatechange = function(state){
-				if (req.readyState == 4){
-					if (req.status === 200){
-						done(null, req.responseText)	
-					}
-					done(req, null)
-				}
+<script src="/static/app.js"></script>
+<script>
+angular.module('lightsApp', ['ngMaterial'])
+.directive('powerSymbol', function() {
+	return {
+		restrict: 'E',
+		scope: {
+			isOn: '='
+		},
+		template: '<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="40px" height="40px" viewBox="0 0 100 100"><g class="Layer_x0020_1"><g class="_230834280"><path class="outer" fill="none" fill-rule="nonzero" stroke="#131516" stroke-width="4.99965" stroke-linecap="round" stroke-linejoin="round" d="M96.0834 50.0201c0,-25.4376 -20.7261,-46.0433 -46.2216,-46.0433 -25.336,0 -45.9464,20.6057 -45.9464,46.0433 0,25.4341 20.6104,46.0043 45.9464,46.0043 25.4955,0 46.2216,-20.5702 46.2216,-46.0043z"/><path class="inner" fill="#C1312F" fill-rule="nonzero" d="M36.6901 32.7652c-18.2281,13.4989 -8.60794,42.2247 13.9796,42.2247 22.5462,0 32.1617,-28.7258 13.9785,-42.2247 -4.05948,-2.56537 -7.95951,2.42246 -4.40318,5.77918 12.6674,9.21385 6.0591,29.1947 -9.57527,29.1947 -15.6804,0 -22.1458,-19.9809 -9.61543,-29.1947 3.55042,-3.35672 -0.407484,-8.34455 -4.36421,-5.77918z"/><path class="powersw" fill="#C1312F" fill-rule="nonzero" d="M47.0732 26.8667l0 23.4344c0,2.56537 1.04765,3.61893 3.59649,3.61893 2.50278,0 3.55633,-1.05355 3.55633,-3.61893l0 -23.4344c0,-2.4449 -1.05355,-3.59649 -3.55633,-3.59649 -2.54884,0 -3.59649,1.15158 -3.59649,3.59649z" style="transform: rotate(0deg);transform-origin: 50% 41%;transition: 1s linear all;"/></g></g></svg>',
+		link: function(scope, element, attrs) {
+			scope.$watch('isOn', function(){
+				var rotateVal = scope.isOn == 0 ? 0 : 90;
+				element[0].getElementsByClassName('powersw')[0].style.transform = 'rotate('+rotateVal+'deg)';
+			});
+		}
+	}
+})
+.controller('AppCtrl', function($scope, $http, $materialToast) {
+	$scope.lights = [];
+	$http.get('/devices/power')
+		.success(function(data, status, headers) {
+			$scope.lights = data;
+		});
+	function updateServer(name, val) {
+		$http.get('/devices/power/update?device='+name + '&val=' + val);
+	}
+	function findLightId(lightName) {
+		for (var i = 0; i < $scope.lights.length; i++) {
+			if ($scope.lights[i].name == lightName) {
+				return i;
 			}
-			req.open('GET', url);
-			req.send();
 		}
+	}
+	function findLight(lightName) {
+		return $scope.lights[findLightId(lightName)];
+	}
 
-		function setup_events(){
-			var lights = document.getElementById('lightslist');
-			lights.addEventListener('click', function(e){
-				if (e.target.nodeName == 'A'){
-					var action = e.target.attributes.getNamedItem("data-action");
-					var light = e.target.parentNode.attributes.getNamedItem('data-light');
-					if (action != null && light != null){
-						send_control(light.value, action.value);
-					}
-				}
-			})
+	$scope.updateLight = function(lightName) {
+		var light = findLight(lightName);
+		updateServer(lightName, light.powered_state);
+	}
+	$scope.togglePower = function(lightName) {
+		var i = findLightId(lightName);
+		if ($scope.lights[i].powered_state == 0) {
+			$scope.lights[i].powered_state = $scope.lights[i].maxvalue;
+		} else {
+			$scope.lights[i].powered_state = 0;
 		}
-
-		setup_events();
-
-		function send_control(light, val){
-			get_request_url('/light/?light=' + light + '&value=' + val, function(err, data){
-				console.log([err, data]);
-			})
-		}
-
-		function render_controls(){
-			document.getElementById('lightslist').innerHTML = tmpl("lights_tpl")(light_control);
-		}
-
-		function download_data(){
-			get_request_url('/lights', function(err, data){
-				if (!err){
-					light_control.lights = JSON.parse(data);
-					render_controls();
-				} else {
-					//alert(err);
-				}
-			})
-		}
-
-		download_data();
-
-	</script>
+		$scope.updateLight(lightName);
+	}
+});
+</script>
 
 </body>
 </html>

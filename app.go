@@ -14,6 +14,7 @@ import (
 	"time"
 	"fmt"
 	"encoding/json"
+	"errors"
 )
 
 var serialPort = flag.String("serial", "/dev/master", "Serial Port Path to Use")
@@ -22,9 +23,12 @@ var useSerial = flag.Bool("enableserial", true, "Use serial?")
 
 type PowerDevice struct {
 	Name string `json:"name"`
+	Type string `json:"type"`
+	MaxValue int `json:"maxvalue"`
+	Channel int `json:"channel"`
 	OnChannel int `json:"on"`
 	OffChannel int `json:"off"`
-	PoweredState bool `json:"powered_state"`
+	PoweredState int `json:"powered_state"`
 }
 
 type ActionDevice struct {
@@ -34,8 +38,8 @@ type ActionDevice struct {
 }
 
 var ConfigJson struct {
-	PowerDevices []PowerDevice `json:"power_devices"`
-	ActionDevices []ActionDevice `json:"action_devices"`
+	PowerDevices []PowerDevice `json:"devices"`
+	ActionDevices []ActionDevice `json:"actions"`
 }
 
 var SerialPort io.ReadWriteCloser
@@ -52,20 +56,27 @@ func connectSerial() {
 func homePageHandler(w http.ResponseWriter, r *http.Request){
 	http.ServeFile(w, r, "views/index.html")
 }
+func appJSHandler(w http.ResponseWriter, r *http.Request){
+	http.ServeFile(w, r, "static/app.js")
+}
+func appCSSHandler(w http.ResponseWriter, r *http.Request){
+	http.ServeFile(w, r, "static/app.css")
+}
+
 
 func findDevice(action string) *PowerDevice {
-	for _, el := range ConfigJson.PowerDevices {
-		if el.Name == action {
-			return &el
+	for i := range ConfigJson.PowerDevices {
+		if ConfigJson.PowerDevices[i].Name == action {
+			return &ConfigJson.PowerDevices[i]
 		}
 	}
 	return nil
 }
 
 func findAction(action string) *ActionDevice {
-	for _, el := range ConfigJson.ActionDevices {
-		if el.Name == action {
-			return &el
+	for i := range ConfigJson.ActionDevices {
+		if ConfigJson.ActionDevices[i].Name == action {
+			return &ConfigJson.ActionDevices[i]
 		}
 	}
 	return nil
@@ -84,17 +95,62 @@ func sendDeviceSignal(OnChannel int) {
 	}
 }
 
-func turnOnDevice(w http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	device_name := vars["device"]
+
+func sendSerialCommand(sigtype int, channel int, value int) error {
+	_, err := fmt.Fprintf(SerialPort, "%d%c%dw\n", channel, sigtype, value)
+	fmt.Printf("%d%c%dw\n", channel, sigtype, value)
+	return err
+}
+
+func sendDeviceUpdate(device *PowerDevice, value int) error {
+	switch device.Type {
+	case "remote": {
+		if (value == 1){
+			return sendSerialCommand('r', device.OnChannel, 1)
+		} else if (value == 0) {
+			return sendSerialCommand('r', device.OffChannel, 1)
+		}
+		return errors.New("device: invalid binary value") // Invalid value.
+	}
+	case "local": {
+		if (value == 1 || value == 0) {
+			return sendSerialCommand('l', device.Channel, value)
+		}
+		return errors.New("device: invalid binary value") // Invalid value.
+	}
+	case "dmx": {
+		if (value < 0 || value >= 256) {
+			return errors.New("device: argument out of range") // Obviously out of range.
+		}
+		return sendSerialCommand('d', device.Channel, value)
+	}
+	default:
+		return errors.New("device: type unknown") // Invalid type.
+	return nil
+	}
+}
+
+func updateDevice(w http.ResponseWriter, req *http.Request) {
+	device_name := req.FormValue("device")
 	device := findDevice(device_name)
 	if device == nil {
 		http.Error(w, "Can't find Device", http.StatusNotFound)
 		return
 	}
-	sendDeviceSignal(device.OnChannel)
-	fmt.Fprintf(w, "OK", device.Name);
-	fmt.Printf("[device_change]: %s turning on.\n", device_name);
+	value, err := strconv.Atoi(req.FormValue("val"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = sendDeviceUpdate(device, value)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	device.PoweredState = value
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, "{\"ok\": true}")
+
+	fmt.Printf("[device_change]: %s = %d.\n", device_name, value);
 }
 
 func turnOffDevice(w http.ResponseWriter, req *http.Request) {
@@ -110,6 +166,19 @@ func turnOffDevice(w http.ResponseWriter, req *http.Request) {
 	fmt.Printf("[device_change]: %s turning off.\n", device_name);
 }
 
+func turnOnDevice(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	device_name := vars["device"]
+	device := findDevice(device_name)
+	if device == nil {
+		http.Error(w, "Can't find Device", http.StatusNotFound)
+		return
+	}
+	sendDeviceSignal(device.OnChannel)
+	fmt.Fprintf(w, "OK", device.Name);
+	fmt.Printf("[device_change]: %s turning off.\n", device_name);
+}
+
 func runCommand(action_info *ActionDevice, req *http.Request) {
 	val, err := strconv.Atoi(req.FormValue("val"))
 	if err == nil {
@@ -120,6 +189,7 @@ func runCommand(action_info *ActionDevice, req *http.Request) {
 		cmd.Start()
 	}
 }
+
 
 func performAction(w http.ResponseWriter, req *http.Request) {
 	action := mux.Vars(req)["action"]
@@ -140,6 +210,7 @@ func performAction(w http.ResponseWriter, req *http.Request) {
 
 func listActions(w http.ResponseWriter, req *http.Request) {
 	enc := json.NewEncoder(w)
+	w.Header().Set("Content-Type", "application/json")
 	if err := enc.Encode(&ConfigJson.ActionDevices); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -147,6 +218,7 @@ func listActions(w http.ResponseWriter, req *http.Request) {
 
 func queryAllLightState(w http.ResponseWriter, req *http.Request) {
 	enc := json.NewEncoder(w)
+	w.Header().Set("Content-Type", "application/json")
 	if err := enc.Encode(&ConfigJson.PowerDevices); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -159,6 +231,7 @@ func queryLightState(w http.ResponseWriter, req *http.Request) {
 	if device == nil {
 		http.Error(w, "Can't find Device", http.StatusNotFound)
 	}
+	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(&device); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -167,14 +240,25 @@ func queryLightState(w http.ResponseWriter, req *http.Request) {
 
 func setupMuxes() {
 	r := mux.NewRouter()
-	r.HandleFunc("/", homePageHandler)
+
+	// Deprecated! Please use newer versions.
 	r.HandleFunc("/devices/power/{device}/on", turnOnDevice)
 	r.HandleFunc("/devices/power/{device}/off", turnOffDevice)
 	r.HandleFunc("/actions/{action}", performAction)
-	r.HandleFunc("/actions", listActions)
 	r.HandleFunc("/devices/power/{device}", queryLightState)
-	r.HandleFunc("/devices/power", queryAllLightState)
+	r.HandleFunc("/", homePageHandler);
+
 	http.Handle("/", r)
+}
+
+func setupHttpHandlers() {
+
+	// Newer versions :).
+	http.HandleFunc("/devices/power", queryAllLightState)
+	http.HandleFunc("/actions", listActions)
+	http.HandleFunc("/devices/power/update", updateDevice)
+	http.HandleFunc("/static/app.js", appJSHandler);
+	http.HandleFunc("/static/app.css", appCSSHandler);
 }
 
 func readConfigFile() {
@@ -189,11 +273,23 @@ func readConfigFile() {
 	fmt.Printf("Successfully read JSON file.\n")
 }
 
+func updateMaxValue(device *PowerDevice) {
+	switch device.Type {
+	case "dmx":
+		device.MaxValue = 255;
+	case "local":
+		device.MaxValue = 1;
+	case "remote":
+		device.MaxValue = 1;
+	}
+}
+
 func setupLightState() {
 	// turn off all lights
-	for _, el := range ConfigJson.PowerDevices {
-		sendDeviceSignal(el.OffChannel)
-		el.PoweredState = false
+	for i := range ConfigJson.PowerDevices {
+		device := &ConfigJson.PowerDevices[i]
+		updateMaxValue(device)
+		sendDeviceUpdate(device, 0)
 		time.Sleep(100)
 	}
 }
@@ -206,6 +302,7 @@ func main(){
 		connectSerial()
 	}
 	setupLightState()
+	setupHttpHandlers()
 	setupMuxes()
 	fmt.Printf("Setup paths.\n")
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *webPort), nil))

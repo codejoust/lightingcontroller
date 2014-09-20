@@ -1,10 +1,13 @@
 {
-    "power_devices": [
-    {"name": "lightmain", "on": 11, "off": 12},
-    {"name": "lightbr1",  "on": 10, "off": 13},
-    {"name": "lightbr2", "on": 7, "off": 9},
-    {"name": "heater", "on": 5, "off": 7}
-  ], "action_devices": [
+    "devices": [
+    {"name": "lightmain", "type": "remote", "on": 11, "off": 12},
+    {"name": "lightbr1",  "type": "remote", "on": 10, "off": 13},
+    {"name": "lightbr2", "type": "remote", "on": 7, "off": 9},
+    {"name": "heater", "type": "remote", "on": 5, "off": 7},
+    {"name": "iain_desk_lamp", "type": "local", "channel": 2},
+    {"name": "bed_bulb", "type": "dmx", "channel": 1},
+    {"name": "main_bulb", "type": "dmx", "channel": 2}
+  ], "actions": [
     {"name": "buzzer", "type": "script", "path": "buzzer"},
     {"name": "playsong", "type": "script", "path": "start_music"},
     {"name": "volume_up", "type": "script", "path": "volume_up"},
